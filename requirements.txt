@@ -1,0 +1,6 @@
+pandas
+osmnx
+networkx
+folium
+streamlit
+scikit-learn

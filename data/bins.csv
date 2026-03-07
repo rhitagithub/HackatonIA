@@ -1,0 +1,11 @@
+bin_id,latitude,longitude,zone,fill_level
+P001,33.5731,-7.5898,Centre,25
+P002,33.5740,-7.5905,Marche,84
+P003,33.5725,-7.5889,Residentiel,67
+P004,33.5751,-7.5912,Centre,92
+P005,33.5719,-7.5878,Marche,45
+P006,33.5708,-7.5869,Residentiel,81
+P007,33.5760,-7.5920,Centre,38
+P008,33.5748,-7.5882,Marche,88
+P009,33.5722,-7.5901,Residentiel,55
+P010,33.5736,-7.5875,Centre,96
