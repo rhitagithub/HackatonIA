@@ -10,7 +10,7 @@ from routing.optimize_route import optimize_route
 from maps.visualize_map import create_map
 
 
-def run_batch_pipeline():
+def run_batch_pipeline(auto_collect: bool = False):
     print("1) Simulation IoT...")
     bins = generate_bins_with_status()
     print(f"   - {len(bins)} poubelles traitées")
@@ -30,9 +30,13 @@ def run_batch_pipeline():
     output_map = create_map()
     print(f"   - carte: {output_map}")
 
-    print("5) Mise à jour post-collecte...")
-    reset_result = apply_collection_reset()
-    print(f"   - poubelles vidées après passage camion: {reset_result['collected_count']}")
+    if auto_collect:
+        print("5) Mise à jour post-collecte...")
+        reset_result = apply_collection_reset()
+        print(f"   - poubelles vidées après passage camion: {reset_result['collected_count']}")
+    else:
+        print("5) Mise à jour post-collecte...")
+        print("   - ignoree (mode manuel dashboard)")
 
     print("\nPipeline terminé.")
 
@@ -51,6 +55,7 @@ def run_live_pipeline(
     project_root = Path(__file__).resolve().parent
     route_path = project_root / "data/optimized_route.csv"
     route_snapshot_path = project_root / "data/route_snapshot_bins.csv"
+    route_meta_path = project_root / "data/route_meta.json"
 
     print(
         f"Mode live (remplissage uniquement): {ticks} ticks, {tick_seconds}s/tick, "
@@ -69,6 +74,8 @@ def run_live_pipeline(
     ).to_csv(route_path, index=False)
     if route_snapshot_path.exists():
         route_snapshot_path.unlink()
+    if route_meta_path.exists():
+        route_meta_path.unlink()
 
     for i in range(1, ticks + 1):
         bins = generate_bins_with_status(
@@ -107,6 +114,11 @@ def main():
         default=6.0,
         help="Multiplicateur de vitesse de remplissage en mode live.",
     )
+    parser.add_argument(
+        "--auto-collect-batch",
+        action="store_true",
+        help="En mode batch, vide automatiquement les poubelles de la tournee.",
+    )
     args = parser.parse_args()
 
     if args.live:
@@ -117,7 +129,7 @@ def main():
             speed_factor=args.speed_factor,
         )
     else:
-        run_batch_pipeline()
+        run_batch_pipeline(auto_collect=args.auto_collect_batch)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-import time
 
 import numpy as np
 import pandas as pd
@@ -99,10 +98,12 @@ def _load_or_create_state(input_path: str, state_path: str, seed: int = 42) -> p
 def _save_state(state_df: pd.DataFrame, state_path: str) -> None:
     path = _project_path(state_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    state_df.to_csv(path, index=False)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    state_df.to_csv(tmp, index=False)
+    tmp.replace(path)
 
 
-def _append_events(events_rows: list[dict], events_path: str) -> None:
+def _append_events(events_rows: list[dict], events_path: str, max_rows: int = 5000) -> None:
     if not events_rows:
         return
     events_file = _project_path(events_path)
@@ -130,7 +131,11 @@ def _append_events(events_rows: list[dict], events_path: str) -> None:
         out = pd.concat([old.astype("object"), new_events.astype("object")], ignore_index=True)
     else:
         out = new_events
-    out.to_csv(events_file, index=False)
+    if max_rows and len(out) > int(max_rows):
+        out = out.tail(int(max_rows)).reset_index(drop=True)
+    tmp = events_file.with_suffix(events_file.suffix + ".tmp")
+    out.to_csv(tmp, index=False)
+    tmp.replace(events_file)
 
 
 def _build_snapshot(state_df: pd.DataFrame, output_path: str) -> pd.DataFrame:
@@ -139,7 +144,9 @@ def _build_snapshot(state_df: pd.DataFrame, output_path: str) -> pd.DataFrame:
     snapshot["status"] = snapshot["fill_level"].apply(assign_status)
     out_file = _project_path(output_path)
     out_file.parent.mkdir(parents=True, exist_ok=True)
-    snapshot.to_csv(out_file, index=False)
+    tmp = out_file.with_suffix(out_file.suffix + ".tmp")
+    snapshot.to_csv(tmp, index=False)
+    tmp.replace(out_file)
     return snapshot
 
 
@@ -151,6 +158,7 @@ def generate_bins_with_status(
     min_elapsed_hours=1.0,
     forced_elapsed_hours=None,
     speed_factor=1.0,
+    max_events_rows=5000,
     seed=42,
 ):
     state = _load_or_create_state(input_path=input_path, state_path=state_path, seed=seed)
@@ -190,48 +198,9 @@ def generate_bins_with_status(
             for _, row in bins.iterrows()
         ],
         events_path=events_path,
+        max_rows=max_events_rows,
     )
     return bins
-
-
-def run_live_fill_simulation(
-    ticks=120,
-    tick_seconds=5,
-    simulated_hours_per_tick=0.5,
-    speed_factor=6.0,
-    output_path="data/bins_with_status.csv",
-    state_path="data/bins_state.csv",
-    events_path="data/fill_events.csv",
-):
-    """
-    Run a continuous fill simulation in a single process execution.
-    Each tick advances simulated time by `simulated_hours_per_tick`.
-    """
-    ticks = max(1, int(ticks))
-    tick_seconds = max(1, int(tick_seconds))
-    simulated_hours_per_tick = max(0.01, float(simulated_hours_per_tick))
-
-    speed_factor = max(0.1, float(speed_factor))
-    print(
-        f"Simulation continue demarree: {ticks} ticks, "
-        f"{tick_seconds}s/tick, {simulated_hours_per_tick:.2f}h simulee/tick, "
-        f"speed x{speed_factor:.1f}"
-    )
-    for i in range(1, ticks + 1):
-        bins = generate_bins_with_status(
-            output_path=output_path,
-            state_path=state_path,
-            events_path=events_path,
-            min_elapsed_hours=0.0,
-            forced_elapsed_hours=simulated_hours_per_tick,
-            speed_factor=speed_factor,
-            seed=42 + i,
-        )
-        critical_count = int((bins["status"] == "critique").sum())
-        max_fill = float(bins["fill_level"].max())
-        print(f"[tick {i}/{ticks}] critiques={critical_count} max_fill={max_fill:.1f}%")
-        if i < ticks:
-            time.sleep(tick_seconds)
 
 
 def apply_collection_reset(

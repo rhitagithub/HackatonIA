@@ -57,6 +57,7 @@ def create_map(
     monitored_count = int((bins["status"] == "a_surveille").sum())
     normal_count = int((bins["status"] == "normal").sum())
 
+    # Keep one single source of truth for displayed distance: route CSV legs.
     total_distance_from_file = 0.0
     if "distance_from_previous_m" in route_df.columns:
         total_distance_from_file += route_df["distance_from_previous_m"].sum()
@@ -67,9 +68,10 @@ def create_map(
         graph = _build_graph(depot_lat, depot_lon, bins)
         depot_node = ox.nearest_nodes(graph, X=depot_lon, Y=depot_lat)
         route_nodes = [depot_node]
+        bins_ids = set(bins["bin_id"])
 
         for _, route_row in route_df.iterrows():
-            if route_row["bin_id"] not in set(bins["bin_id"]):
+            if route_row["bin_id"] not in bins_ids:
                 continue
             bin_row = bins[bins["bin_id"] == route_row["bin_id"]].iloc[0]
             route_nodes.append(ox.nearest_nodes(graph, X=bin_row["longitude"], Y=bin_row["latitude"]))
@@ -81,9 +83,6 @@ def create_map(
                     path = nx.shortest_path(graph, route_nodes[i], route_nodes[i + 1], weight="length")
                     path_coords = [(graph.nodes[n]["y"], graph.nodes[n]["x"]) for n in path]
                     folium.PolyLine(path_coords, color="blue", weight=4, opacity=0.8).add_to(m)
-                    total_distance_from_file += nx.shortest_path_length(
-                        graph, route_nodes[i], route_nodes[i + 1], weight="length"
-                    ) if i == len(route_nodes) - 2 else 0.0
                 except nx.NetworkXNoPath:
                     continue
 

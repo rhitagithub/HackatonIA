@@ -1,1 +1,4 @@
 vehicle_id,order,bin_id,node,distance_from_previous_m,cumulative_distance_m
+1,1,P002,1414056193,631.0,631.0
+1,2,P005,5593488779,412.0,1043.0
+1,3,P009,6847827559,222.0,1265.0

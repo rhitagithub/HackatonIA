@@ -14,6 +14,13 @@ pip install -r requirements.txt
 python main.py
 ```
 
+- `python main.py` genere les sorties sans vider automatiquement les poubelles.
+- Pour vider automatiquement en mode batch:
+
+```bash
+python main.py --auto-collect-batch
+```
+
 ## Mode simulation continue (temps reel)
 
 ```bash

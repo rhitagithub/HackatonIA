@@ -2,6 +2,7 @@ import pandas as pd
 import osmnx as ox
 import networkx as nx
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+from pathlib import Path
 
 
 def build_drive_graph(depot_lat, depot_lon, bins_df):
@@ -24,19 +25,38 @@ def optimize_route(
     output_path="data/optimized_route.csv",
     num_vehicles=1,
 ):
+    def _atomic_write_csv(df: pd.DataFrame, path_str: str) -> None:
+        path = Path(path_str)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        df.to_csv(tmp, index=False)
+        tmp.replace(path)
+
     bins = pd.read_csv(bins_with_status_path)
     depot = pd.read_csv(depot_path)
 
     critical_bins = bins[bins["status"] == "critique"].copy()
     if critical_bins.empty:
-        pd.DataFrame(
-            columns=["order", "bin_id", "node", "distance_from_previous_m", "cumulative_distance_m"]
-        ).to_csv(output_path, index=False)
+        _atomic_write_csv(
+            pd.DataFrame(
+                columns=[
+                    "vehicle_id",
+                    "order",
+                    "bin_id",
+                    "node",
+                    "distance_from_previous_m",
+                    "cumulative_distance_m",
+                ]
+            ),
+            output_path,
+        )
         return {
             "route_df": pd.DataFrame(),
             "total_distance_m": 0.0,
             "return_to_depot_m": 0.0,
             "critical_count": 0,
+            "missing_critical_bins": [],
+            "is_complete": True,
         }
 
     print("Poubelles critiques détectées :")
@@ -66,7 +86,8 @@ def optimize_route(
             unreachable_bin_ids.append(row["bin_id"])
 
     if not reachable_rows:
-        pd.DataFrame(
+        _atomic_write_csv(
+            pd.DataFrame(
             columns=[
                 "vehicle_id",
                 "order",
@@ -75,13 +96,17 @@ def optimize_route(
                 "distance_from_previous_m",
                 "cumulative_distance_m",
             ]
-        ).to_csv(output_path, index=False)
+            ),
+            output_path,
+        )
         return {
             "route_df": pd.DataFrame(),
             "total_distance_m": 0.0,
             "return_to_depot_m": 0.0,
             "critical_count": 0,
             "unreachable_bins": unreachable_bin_ids,
+            "missing_critical_bins": sorted(unreachable_bin_ids),
+            "is_complete": False,
             "solver": "ortools_vrp",
         }
 
@@ -160,7 +185,11 @@ def optimize_route(
     route_df = pd.DataFrame(route_rows)
     if not route_df.empty:
         route_df = route_df.sort_values(["vehicle_id", "order"]).reset_index(drop=True)
-    route_df.to_csv(output_path, index=False)
+    _atomic_write_csv(route_df, output_path)
+    expected_ids = set(critical_bins["bin_id"].astype(str).tolist())
+    covered_ids = set(route_df["bin_id"].astype(str).tolist()) if not route_df.empty else set()
+    missing_critical_bins = sorted(list(expected_ids - covered_ids))
+    is_complete = len(missing_critical_bins) == 0
 
     return {
         "route_df": route_df,
@@ -168,6 +197,8 @@ def optimize_route(
         "return_to_depot_m": round(total_return_to_depot, 2),
         "critical_count": len(route_df),
         "unreachable_bins": unreachable_bin_ids,
+        "missing_critical_bins": missing_critical_bins,
+        "is_complete": is_complete,
         "solver": "ortools_vrp",
     }
 

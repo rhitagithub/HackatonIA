@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+
+cache/
+maps/smart_waste_map.html
+
+data/bins_state.csv
+data/bins_with_status.csv
+data/fill_events.csv
+data/fill_history.csv
+data/fill_predictions.csv
+data/optimized_route.csv
+data/route_snapshot_bins.csv
+data/route_meta.json
